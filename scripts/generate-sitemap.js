@@ -5,17 +5,11 @@ const xmlFormatter = require('xml-formatter');
 require('dotenv').config();
 
 // Load environment variables
-const CONTENTFUL_SPACE = process.env.CONTENTFUL_SPACE_ID;
-const CONTENTFUL_ACCESS_TOKEN = process.env.CONTENTFUL_ACCESS_TOKEN;
-
-if (!CONTENTFUL_SPACE || !CONTENTFUL_ACCESS_TOKEN) {
-  console.error('Missing required environment variables. Please check your .env file.');
-  process.exit(1);
-}
-
+const CONTENTFUL_SPACE = 'vqfwb6i9gobc';
+const CONTENTFUL_ACCESS_TOKEN = 'D28nu7oXlUfU86Zx6ebvbkGN2eay2HZXJb5xa1pYN_E';
 const BASE_URL = 'https://legalfeefinder.com';
 const CURRENT_DATE = new Date().toISOString().split('T')[0];
-const MAX_URLS_PER_SITEMAP = 1000; // Google's recommended limit
+const MAX_URLS_PER_SITEMAP = 1000;
 
 const contentfulClient = contentful.createClient({
   space: CONTENTFUL_SPACE,
@@ -100,7 +94,7 @@ ${sitemaps}
 async function fetchAllPages() {
   const allItems = [];
   let skip = 0;
-  const limit = 1000; // Contentful's max limit per request
+  const limit = 1000;
 
   while (true) {
     console.log(`Fetching pages ${skip} to ${skip + limit}...`);
@@ -140,18 +134,16 @@ async function generateSitemap() {
     const allEntries = [...CORE_PAGES, ...contentfulEntries];
     const totalSitemaps = Math.ceil(allEntries.length / MAX_URLS_PER_SITEMAP);
 
-    if (totalSitemaps > 50000) {
-      throw new Error('Too many sitemaps! Maximum allowed is 50,000');
-    }
-
-    const sitemapFiles = [];
-    const publicDir = path.resolve(process.cwd(), 'public');
-    
-    if (!fs.existsSync(publicDir)) {
-      fs.mkdirSync(publicDir, { recursive: true });
-    }
+    // Ensure directories exist
+    const dirs = ['public', 'dist'].map(dir => path.resolve(process.cwd(), dir));
+    dirs.forEach(dir => {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    });
 
     // Generate individual sitemaps
+    const sitemapFiles = [];
     for (let i = 0; i < totalSitemaps; i++) {
       const start = i * MAX_URLS_PER_SITEMAP;
       const end = start + MAX_URLS_PER_SITEMAP;
@@ -161,36 +153,28 @@ async function generateSitemap() {
       console.log(`Generating ${filename} with ${entries.length} URLs...`);
       
       const sitemap = generateSitemapXML(entries);
-      const sitemapPath = path.join(publicDir, filename);
       
-      fs.writeFileSync(sitemapPath, sitemap);
-      
-      // Verify file size (50MB = 52,428,800 bytes)
-      const stats = fs.statSync(sitemapPath);
-      if (stats.size > 52428800) {
-        throw new Error(`Sitemap ${filename} exceeds 50MB limit!`);
-      }
+      // Write to both public and dist
+      dirs.forEach(dir => {
+        const sitemapPath = path.join(dir, filename);
+        fs.writeFileSync(sitemapPath, sitemap);
+        console.log(`Written ${filename} to ${dir}`);
+      });
       
       sitemapFiles.push(filename);
     }
 
-    // Generate sitemap index
-    if (totalSitemaps > 1) {
-      console.log('Generating sitemap index...');
-      const sitemapIndex = generateSitemapIndex(sitemapFiles);
-      fs.writeFileSync(path.join(publicDir, 'sitemap.xml'), sitemapIndex);
-    } else {
-      // If only one sitemap, use it as the main sitemap
-      fs.copyFileSync(
-        path.join(publicDir, sitemapFiles[0]),
-        path.join(publicDir, 'sitemap.xml')
-      );
-    }
+    // Generate and write sitemap index
+    const sitemapIndex = generateSitemapIndex(sitemapFiles);
+    dirs.forEach(dir => {
+      const indexPath = path.join(dir, 'sitemap.xml');
+      fs.writeFileSync(indexPath, sitemapIndex);
+      console.log(`Written sitemap index to ${dir}/sitemap.xml`);
+    });
 
     console.log('\nSitemap generation complete!');
     console.log(`Total URLs: ${allEntries.length}`);
     console.log(`Total sitemap files: ${sitemapFiles.length}`);
-    console.log(`Each sitemap contains max ${MAX_URLS_PER_SITEMAP} URLs`);
   } catch (error) {
     console.error('Error generating sitemap:', error);
     process.exit(1);
