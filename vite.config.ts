@@ -8,13 +8,14 @@ export default defineConfig({
     {
       name: 'copy-sitemap',
       writeBundle: async () => {
-        // Copy sitemap.xml from public to dist if it exists
-        if (fs.existsSync('public/sitemap.xml')) {
-          fs.copyFileSync('public/sitemap.xml', 'dist/sitemap.xml');
-          console.log('Copied sitemap.xml from public to dist directory');
-        } else {
-          console.warn('Warning: sitemap.xml not found in public directory');
-        }
+        // Copy sitemap files from public to dist
+        const files = fs.readdirSync('public');
+        files.forEach(file => {
+          if (file.startsWith('sitemap')) {
+            fs.copyFileSync(`public/${file}`, `dist/${file}`);
+            console.log(`Copied ${file} from public to dist directory`);
+          }
+        });
       }
     }
   ],
